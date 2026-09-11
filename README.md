@@ -1,6 +1,8 @@
 # 系统运行能力考核验证
 
-最小可运行前后端分离框架：Vue3 + Vite + TypeScript ↔ Java 17 + Spring Boot ↔ MySQL（`lab_assess` 表）。
+最小可运行前后端分离框架：Vue3 + Vite + TypeScript ↔ Java 17 + Spring Boot ↔ **本机 MySQL**（`lab_assess` 表）。
+
+**请使用自己电脑上的 MySQL。** 服务器上的数据表已不可用，不要再连接服务器数据库。启动前必须在本机建库、建表，并把 `.env` 中的 `DB_*` 指向本机。
 
 ## 项目结构
 
@@ -20,8 +22,24 @@ git_assess_GitHub/
 |------|------|
 | 前端 | Node.js 18+、npm |
 | 后端 | JDK 17+（需配置 `JAVA_HOME`） |
-| 数据库 | MySQL 5.7+，已执行 `sql/as_v0.1.1_260522.sql` 建表 |
+| 数据库 | **本机** MySQL 5.7+，自行建库并执行 `sql/as_v0.1.1_260522.sql` 建表 |
 | Maven | **不需要**（使用 `mvnw` / `mvnw.cmd`） |
+
+## 1. 本机数据库（启动前必做）
+
+服务器数据库已停用，启动前在本机 MySQL 建库并导入表：
+
+```powershell
+mysql -u root -p
+```
+
+```sql
+CREATE DATABASE IF NOT EXISTS lab_assess DEFAULT CHARACTER SET utf8mb4;
+USE lab_assess;
+SOURCE /你的项目路径/sql/as_v0.1.1_260522.sql;
+```
+
+`SOURCE` 换成你电脑上该 sql 文件的绝对路径。然后把 `.env` 中的 `DB_*` 改成本机信息（`DB_HOST=127.0.0.1`，`DB_NAME=lab_assess`），不要填服务器地址。
 
 ## 环境变量（.env）
 
@@ -30,48 +48,30 @@ git_assess_GitHub/
 ```powershell
 # 在项目根目录执行
 copy .env.example .env
-# 编辑 .env，至少填写 DB_HOST、DB_NAME、DB_USERNAME、DB_PASSWORD
+# 编辑 .env：DB_* 必须改为本机 MySQL
 ```
 
 | 变量 | 说明 |
 |------|------|
 | `SERVER_PORT` | 后端监听端口 |
 | `FRONTEND_PORT` | 前端 dev 端口 |
-| `BACKEND_TARGET` | `local`（本机后端）或 `remote`（服务器 Docker 后端） |
-| `BACKEND_LOCAL_HOST` / `BACKEND_LOCAL_PORT` | `BACKEND_TARGET=local` 时 Vite 代理目标 |
-| `BACKEND_REMOTE_HOST` / `BACKEND_REMOTE_PORT` | `BACKEND_TARGET=remote` 时 Vite 代理目标（默认端口 9019） |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` | MySQL 连接 |
-| `DB_USERNAME` / `DB_PASSWORD` | 数据库账号 |
+| `BACKEND_LOCAL_HOST` / `BACKEND_LOCAL_PORT` | 前端 Vite 代理的本机后端地址（默认 `127.0.0.1:8080`） |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` | **本机** MySQL 连接（`DB_HOST` 一般为 `127.0.0.1`） |
+| `DB_USERNAME` / `DB_PASSWORD` | 本机数据库账号 |
 | `DB_TIMEZONE` / `DB_JDBC_PARAMS` | JDBC 参数 |
 | `JPA_SHOW_SQL` | 是否打印 SQL |
 | `CORS_ALLOWED_ORIGIN_PATTERNS` | 逗号分隔的 CORS 来源 |
 | `DOTENV_PATH` | 可选，`.env` 绝对路径 |
 
-1. 在 MySQL 中执行 `sql/as_v0.1.1_260522.sql`（创建 `lab_assess` 表）。
-2. 后端启动前由 `EnvLoader` 加载根目录 `.env`；前端 `vite.config.ts` 同样读取根目录 `.env`。
-
-### 切换本地 / 远程后端
-
-在 `.env` 中设置 `BACKEND_TARGET`：
-
-- `local`：前端 `/api` 代理到 `BACKEND_LOCAL_HOST:BACKEND_LOCAL_PORT`（默认 `127.0.0.1:8080`），需在本机启动 Spring Boot。
-- `remote`：代理到 `BACKEND_REMOTE_HOST:BACKEND_REMOTE_PORT`（默认端口 `9019`），本机可不启后端；填写服务器 IP 或域名后重启 `npm run dev`。
-
-`npm run dev` 启动时控制台会打印当前代理目标，例如 `[vite] BACKEND_TARGET=remote -> http://x.x.x.x:9019`。
+后端启动前由 `EnvLoader` 加载根目录 `.env`；前端 `vite.config.ts` 同样读取根目录 `.env`。开发时前端把 `/api` 代理到本机后端。
 
 ## 启动步骤
 
-### 1. 配置 .env
+### 1. 本机建库建表并配置 .env
 
-见上一节。未配置 `.env` 时前后端启动会报错提示。
+见上文「本机数据库（启动前必做）」。未配置 `.env` 或仍指向服务器数据库时，前后端启动或保存数据会失败。
 
-### 2. 选择启动方式
-
-#### 方式一：使用本地后端
-
-适用于需要本地开发、调试后端代码的场景。
-
-**步骤 1：启动本地后端**
+### 2. 启动后端
 
 ```powershell
 cd backend
@@ -92,7 +92,7 @@ export JAVA_HOME=/path/to/jdk-17
 
 启动成功后控制台出现：`Started AssessApplication`，端口为 `.env` 中的 `SERVER_PORT`。
 
-**步骤 2：启动前端**
+### 3. 启动前端
 
 新开一个终端：
 
@@ -104,43 +104,16 @@ npm run dev
 
 浏览器访问 `.env` 中 `FRONTEND_PORT` 对应地址（默认 5173）。
 
----
-
-#### 方式二：使用服务器后端
-
-适用于使用远程服务器上已部署的 Docker 后端，无需本地启动后端服务。
-
-**步骤 1：配置服务器地址**
-
-在项目根目录 `.env` 文件中设置：
-
-```powershell
-BACKEND_TARGET=remote
-BACKEND_REMOTE_HOST=your-server-ip
-BACKEND_REMOTE_PORT=9019
-```
-
-**步骤 2：启动前端**
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-浏览器访问 `.env` 中 `FRONTEND_PORT` 对应地址（默认 5173）。
-
-前端启动时控制台会打印当前代理目标，例如 `[vite] BACKEND_TARGET=remote -> http://x.x.x.x:9019`。
-
 ## 联调验证
 
 ### 方式一：页面验证（推荐）
 
-1. 先启动后端，再启动前端
-2. 打开 `http://localhost:5173`
-3. 页面自动请求 `/api/health`
-4. 显示绿色 **「联调成功」**，且 `database` 为 `connected` 表示数据库已连通
-5. 填写「成员考核信息」并点击 **保存到数据库**，下方列表应出现新记录
+1. 确认本机 MySQL 已建库建表，且 `.env` 指向本机
+2. 先启动后端，再启动前端
+3. 打开 `http://localhost:5173`
+4. 页面自动请求 `/api/health`
+5. 显示绿色 **「联调成功」**，且 `database` 为 `connected` 表示本机数据库已连通
+6. 填写「成员考核信息」并点击 **保存到数据库**，下方列表应出现新记录
 
 ### 方式二：直接调后端 API
 
@@ -216,7 +189,10 @@ $env:JAVA_HOME = "D:\Java 21"
 
 **`database` 为 `disconnected` 或保存失败**
 
-检查项目根目录 `.env` 中的 `DB_*` 配置，确认 MySQL 允许当前 IP 访问，且 `lab_assess` 表已创建。
+1. 确认用的是**本机 MySQL**，不要连接服务器数据库。
+2. 检查 `.env` 中 `DB_HOST`（一般为 `127.0.0.1`）、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`。
+3. 确认本机库已创建，且已执行 `sql/as_v0.1.1_260522.sql` 生成 `lab_assess` 表。
+4. 确认本机 MySQL 服务已启动。
 
 **端口占用**
 
